@@ -3,4 +3,13 @@ name = "local_area_network"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "local_area_network"
+path = "src/lib.rs"
+
+[[bin]]
+name = "arping"
+path = "src/bin/arping.rs"
+
 [dependencies]
+libc = "0.2.177"
