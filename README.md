@@ -11,8 +11,8 @@ L1 Physical Layer
 - 1500 bytes: Ethernet payload (MTU) → IP header + IP payload (L3 packet)  
 - 4 bytes: Ethernet trailer (FCS)
 
-### ethernet header of linux (if_ether.h)
-[[https://github.com/torvalds/linux/blob/0512e0134582ef85dee77d51aae77dcd1edec495/include/uapi/linux/if_ether.h]]
+### ethernet header of linux ([if_ether.h](https://github.com/torvalds/linux/blob/0512e0134582ef85dee77d51aae77dcd1edec495/include/uapi/linux/if_ether.h))
+
 ```c
 struct ethhdr {
 	unsigned char	h_dest[ETH_ALEN];	/* destination eth addr	*/
@@ -28,8 +28,7 @@ struct ethhdr {
 #define ETH_P_IP	0x0800		/* Internet Protocol packet	*/
 ```
 
-### arp header of linux (if_arp.h)
-[[https://github.com/torvalds/linux/blob/0512e0134582ef85dee77d51aae77dcd1edec495/include/uapi/linux/if_arp.h]]
+### arp header of linux ([if_arp.h](https://github.com/torvalds/linux/blob/0512e0134582ef85dee77d51aae77dcd1edec495/include/uapi/linux/if_arp.h))
 ```c
 struct arphdr {
 	__be16			ar_hrd;			/* format of hardware address	*/
