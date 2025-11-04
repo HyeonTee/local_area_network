@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+    local_area_network:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        volumes:
+            - ..:/workspace:cached
+        command: sleep infinity
+        networks:
+            subnet:
+                ipv4_address: 192.168.0.100
+        mac_address: 02:42:ac:11:00:00
+        cap_add:
+            - NET_RAW
+            - NET_ADMIN
+            - CAP_SYS_ADMIN
+        privileged: true
+
+networks:
+    subnet:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 192.168.0.0/24
+                  gateway: 192.168.0.1
