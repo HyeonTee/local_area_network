@@ -11,5 +11,10 @@ path = "src/lib.rs"
 name = "arping"
 path = "src/bin/arping.rs"
 
+[[bin]]
+name = "ping"
+path = "src/bin/ping.rs"
+
 [dependencies]
+default-net = "0.22.0"
 libc = "0.2.177"
