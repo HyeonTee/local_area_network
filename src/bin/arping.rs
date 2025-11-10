@@ -40,7 +40,7 @@ fn main() {
 		libc::bind(
 			sock_fd,
 			&sockaddr as *const libc::sockaddr_ll as *const libc::sockaddr, /* &sockaddr_ll -> *const sockaddr_ll -> *const sockaddr */
-			std::mem::size_of::<libc::sockaddr_ll>() as libc::socklen_t
+			std::mem::size_of_val(&sockaddr) as libc::socklen_t
 		)
 	};
 
@@ -49,6 +49,7 @@ fn main() {
 	}
 
 	send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
+	recv_arp_reply(sock_fd);
 }
 
 fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u8; 6]) {
@@ -79,4 +80,18 @@ fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u
 	if send_bytes < 0 {
 		panic!("send failed");
 	}
+}
+
+fn recv_arp_reply(sock_fd: i32) {
+	let mut buf = [0u8; 42];
+	let recv_bytes = unsafe { libc::recv(sock_fd, buf.as_ptr() as *mut libc::c_void, buf.len(), 0) };
+	if recv_bytes < 0 {
+		panic!("recv failed");
+	}
+
+	let eth_hdr = EthHdr::new(&mut buf[..14]);
+	eth_hdr.print_ethhdr();
+
+	let arp_hdr = ArpHdr::new(&mut buf[14..42]);
+	arp_hdr.print_arp();
 }
