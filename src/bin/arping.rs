@@ -49,7 +49,7 @@ fn main() {
 	}
 
 	send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
-	recv_arp_reply(sock_fd);
+	recv_arp_reply(sock_fd, src_mac);
 }
 
 fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u8; 6]) {
@@ -57,8 +57,8 @@ fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u
 	let mut buf = [0u8; 42];
 	let (eth_hdr, arp_hdr) = buf.split_at_mut(libc::ETH_HLEN as usize);
 
-	let eth_hdr = unsafe { &mut *(eth_hdr.as_mut_ptr() as *mut EthHdr) };
-	let arp_hdr = unsafe { &mut *(arp_hdr.as_mut_ptr() as *mut ArpHdr) };
+	let eth_hdr = EthHdr::new(eth_hdr);
+	let arp_hdr = ArpHdr::new(arp_hdr);
 
 	// mac addr
 	eth_hdr.h_dest = [0xff; libc::ETH_ALEN as usize];
@@ -76,22 +76,36 @@ fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u
 	arp_hdr.ar_tha = [0x00; libc::ETH_ALEN as usize];
 	arp_hdr.ar_tip = dest_ip;
 
-	let send_bytes = unsafe { libc::send(sock_fd, buf.as_ptr() as *const libc::c_void, buf.len(), 0) };
+	let send_bytes = unsafe { libc::write(sock_fd, buf.as_ptr() as *const libc::c_void, buf.len()) };
 	if send_bytes < 0 {
 		panic!("send failed");
 	}
 }
 
-fn recv_arp_reply(sock_fd: i32) {
+fn recv_arp_reply(sock_fd: i32, mac: [u8; 6]) {
 	let mut buf = [0u8; 42];
-	let recv_bytes = unsafe { libc::recv(sock_fd, buf.as_ptr() as *mut libc::c_void, buf.len(), 0) };
-	if recv_bytes < 0 {
-		panic!("recv failed");
+
+	loop {
+		let recv_bytes = unsafe { libc::read(sock_fd, buf.as_ptr() as *mut libc::c_void, buf.len()) };
+		if recv_bytes < 0 {
+			panic!("recv failed");
+		}
+
+		let (eth_hdr, arp_hdr) = buf.split_at_mut(libc::ETH_HLEN as usize);
+		let eth_hdr = EthHdr::new(eth_hdr);
+		let arp_hdr = ArpHdr::new(arp_hdr);
+		
+		if eth_hdr.h_dest != mac {
+			continue;
+		}
+
+		if arp_hdr.ar_op != libc::ARPOP_REPLY.to_be() {
+			continue;
+		}
+
+		eth_hdr.print_ethhdr();
+		arp_hdr.print_arp();
+
+		break;
 	}
-
-	let eth_hdr = EthHdr::new(&mut buf[..14]);
-	eth_hdr.print_ethhdr();
-
-	let arp_hdr = ArpHdr::new(&mut buf[14..42]);
-	arp_hdr.print_arp();
 }
