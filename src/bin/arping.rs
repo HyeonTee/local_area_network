@@ -1,23 +1,31 @@
-use local_area_network::l2::{if_arp::ArpHdr, if_ether::EthHdr};
+use std::time::Duration;
 
-fn parse_args() -> [u8;4] {
-	let args = std::env::args().collect::<Vec<String>>();
-	if args.len() != 2 {
-		panic!("args.len() should be 2");
-	}
+use clap::Parser;
+use local_area_network::{args::arping_args::ArpingArgs, l2::{if_arp::ArpHdr, if_ether::EthHdr}};
 
-	let dest_ip = args[1].split(".").collect::<Vec<&str>>();
-	if dest_ip.len() != 4 {
-		panic!("Invalid dest ip");
-	}
+// fn parse_args() -> [u8;4] {
+// 	let args = std::env::args().collect::<Vec<String>>();
+// 	if args.len() != 2 {
+// 		panic!("args.len() should be 2");
+// 	}
 
-	let dest_ip: [u8;4] = dest_ip.iter().map(|bit| bit.parse::<u8>().unwrap()).collect::<Vec<u8>>().try_into().unwrap();
+// 	let dest_ip = args[1].split(".").collect::<Vec<&str>>();
+// 	if dest_ip.len() != 4 {
+// 		panic!("Invalid dest ip");
+// 	}
 
-	dest_ip
-}
+// 	let dest_ip: [u8;4] = dest_ip.iter().map(|bit| bit.parse::<u8>().unwrap()).collect::<Vec<u8>>().try_into().unwrap();
+
+// 	dest_ip
+// }
 
 fn main() {
-	let dest_ip = parse_args();
+	// let dest_ip = parse_args();
+
+	let args = ArpingArgs::parse();
+	let dest_ip = args.dest_ip.octets();
+	let count = args.count;
+
 	// socket
 	let sock_fd = unsafe { libc::socket(libc::AF_PACKET, libc::SOCK_RAW, libc::ETH_P_ARP.to_be()) }; /* protocol should be big-endian */
 	if sock_fd < 0 {
@@ -48,8 +56,18 @@ fn main() {
 		panic!("bind failed");
 	}
 
-	send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
-	recv_arp_reply(sock_fd, src_mac);
+	let mut index = 0;
+	while index < count {
+		send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
+		recv_arp_reply(sock_fd, src_mac);
+		println!("index={index}");
+
+		if index < count - 1 {
+			std::thread::sleep(Duration::from_secs(1));	
+		}
+		index += 1;
+	}
+	
 }
 
 fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u8; 6]) {

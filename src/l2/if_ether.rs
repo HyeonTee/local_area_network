@@ -5,7 +5,8 @@ pub struct EthHdr {
 	pub h_dest: [u8; libc::ETH_ALEN as usize],
 	pub h_source: [u8; libc::ETH_ALEN as usize],
 	pub h_proto: u16
-	// packed -> 2bytes padding X
+	// repr(C): ensures the same field layout as a C struct
+    // packed: disables automatic padding between fields (no 2-byte alignment)
 }
 
 impl EthHdr {

@@ -17,6 +17,14 @@ services:
             - NET_ADMIN
             - CAP_SYS_ADMIN
         privileged: true
+    
+    peer:
+        image: ubuntu:22.04
+        command: sleep infinity
+        networks:
+            subnet:
+                ipv4_address: 192.168.0.200
+        mac_address: 02:42:ac:11:00:01
 
 networks:
     subnet:
