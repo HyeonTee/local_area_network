@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use clap::Parser;
-use local_area_network::{args::arping_args::ArpingArgs, l2::{if_arp::ArpHdr, if_ether::EthHdr}};
+use local_area_network::{args::arping_args::ArpingArgs, l2::{if_arp::ArpHdr, if_ether::EthHdr}, nic::interface::get_interface_by_name};
 
 // fn parse_args() -> [u8;4] {
 // 	let args = std::env::args().collect::<Vec<String>>();
@@ -25,6 +25,7 @@ fn main() {
 	let args = ArpingArgs::parse();
 	let dest_ip = args.dest_ip.octets();
 	let count = args.count;
+	let iface_name = args.iface_name;
 
 	// socket
 	let sock_fd = unsafe { libc::socket(libc::AF_PACKET, libc::SOCK_RAW, libc::ETH_P_ARP.to_be()) }; /* protocol should be big-endian */
@@ -33,16 +34,16 @@ fn main() {
 	}
 
 	// eth0 -> index
-	let interface = default_net::get_default_interface().unwrap();
-	let if_index = interface.index as i32;
-	let src_mac = interface.mac_addr.unwrap().octets();
-	let src_ip = interface.ipv4[0].addr.octets();
+	let iface = get_interface_by_name(&iface_name);
+	let if_index = iface.index;
+	let src_mac = iface.mac;
+	let src_ip = iface.ip;
 
 	// socket-interface binding
 	let mut sockaddr: libc::sockaddr_ll = unsafe { std::mem::zeroed() }; 	/* sockaddr_ll : link layer */ 
 	sockaddr.sll_family = libc::AF_PACKET as u16;
 	sockaddr.sll_ifindex = if_index as i32;
-	sockaddr.sll_protocol = (libc::ETH_P_ARP as u16).to_be();				/* protocol should be big-endian */
+	sockaddr.sll_protocol = (libc::ETH_P_ARP as u16).to_be();
 
 	let bind_result = unsafe {
 		libc::bind(
