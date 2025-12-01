@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 pub fn fmt_mac(mac: [u8; 6]) -> String {
 	format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
 }
@@ -36,4 +38,53 @@ pub fn fmt_arp_op(op: u16) -> String {
 	};
 
 	format!("{op_str}(0x{op_le:04x})")
+}
+
+pub fn fmt_duration(duration: Duration) -> String {
+	let secs = duration.as_secs();
+	let millis = duration.subsec_millis();
+	let micros = duration.subsec_micros();
+	let nanos = duration.subsec_nanos();
+
+	let (int, frac, unit) = if secs > 0 {
+		(secs as u32, millis, "sec")
+	} else if millis > 0 {
+		(millis, micros % 1000, "msec")
+	} else if micros > 0 {
+		(micros, nanos % 1000, "usec")
+	} else {
+		(nanos, 0, "nsec")
+	};
+
+	format!("{}.{:0<3} {}", int, frac, unit)
+}
+
+#[cfg(test)]
+mod tests {
+	use std::time::Duration;
+
+	use super::fmt_duration;
+
+	#[test]
+	fn test_fmt_duration() {
+		let duration = Duration::from_secs(1) + Duration::from_millis(123);
+
+		let result = fmt_duration(duration);
+		assert_eq!(result, "1.123 sec");
+
+		let duration = Duration::from_millis(1) + Duration::from_micros(123);
+
+		let result = fmt_duration(duration);
+		assert_eq!(result, "1.123 msec");
+
+		let duration = Duration::from_micros(1) + Duration::from_nanos(12);
+
+		let result = fmt_duration(duration);
+		assert_eq!(result, "1.120 usec");
+
+		let duration = Duration::from_nanos(123);
+
+		let result = fmt_duration(duration);
+		assert_eq!(result, "123.000 nsec");
+	}
 }

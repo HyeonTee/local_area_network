@@ -1,27 +1,9 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::Parser;
-use local_area_network::{args::arping_args::ArpingArgs, l2::{if_arp::ArpHdr, if_ether::EthHdr}, nic::interface::get_interface_by_name};
-
-// fn parse_args() -> [u8;4] {
-// 	let args = std::env::args().collect::<Vec<String>>();
-// 	if args.len() != 2 {
-// 		panic!("args.len() should be 2");
-// 	}
-
-// 	let dest_ip = args[1].split(".").collect::<Vec<&str>>();
-// 	if dest_ip.len() != 4 {
-// 		panic!("Invalid dest ip");
-// 	}
-
-// 	let dest_ip: [u8;4] = dest_ip.iter().map(|bit| bit.parse::<u8>().unwrap()).collect::<Vec<u8>>().try_into().unwrap();
-
-// 	dest_ip
-// }
+use local_area_network::{args::arping_args::ArpingArgs, l2::{if_arp::ArpHdr, if_ether::EthHdr}, nic::interface::get_interface_by_name, util::{fmt_duration, fmt_ip, fmt_mac}};
 
 fn main() {
-	// let dest_ip = parse_args();
-
 	let args = ArpingArgs::parse();
 	let dest_ip = args.dest_ip.octets();
 	let count = args.count;
@@ -59,12 +41,12 @@ fn main() {
 
 	let mut index = 0;
 	while index < count {
+		let start_time = Instant::now(); // monotonic time
 		send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
-		recv_arp_reply(sock_fd, src_mac);
-		println!("index={index}");
+		recv_arp_reply(sock_fd, src_mac, index, start_time);
 
 		if index < count - 1 {
-			std::thread::sleep(Duration::from_secs(1));	
+			std::thread::sleep(Duration::from_secs(1));
 		}
 		index += 1;
 	}
@@ -101,7 +83,7 @@ fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u
 	}
 }
 
-fn recv_arp_reply(sock_fd: i32, mac: [u8; 6]) {
+fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) {
 	let mut buf = [0u8; 42];
 
 	loop {
@@ -122,8 +104,14 @@ fn recv_arp_reply(sock_fd: i32, mac: [u8; 6]) {
 			continue;
 		}
 
-		eth_hdr.print_ethhdr();
-		arp_hdr.print_arp();
+		let elapsed = start_time.elapsed();
+		println!("{} bytes from {} ({}): index={} time={}",
+			recv_bytes, 
+			fmt_mac(arp_hdr.ar_sha), 
+			fmt_ip(arp_hdr.ar_sip), 
+			index, 
+			fmt_duration(elapsed)
+		);
 
 		break;
 	}
