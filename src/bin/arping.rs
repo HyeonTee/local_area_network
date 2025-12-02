@@ -39,7 +39,10 @@ fn main() {
 		panic!("bind failed");
 	}
 
+	set_sock_timeout(sock_fd);
+
 	let mut index = 0;
+	println!("ARPING {}", fmt_ip(dest_ip));
 	while index < count {
 		let start_time = Instant::now(); // monotonic time
 		send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
@@ -51,6 +54,26 @@ fn main() {
 		index += 1;
 	}
 	
+}
+
+fn set_sock_timeout(sock_fd: i32) {
+	let mut recv_timeval: libc::timeval = unsafe { std::mem::zeroed() };
+	recv_timeval.tv_sec = 0;
+	recv_timeval.tv_usec = 999_999;
+
+	let result = unsafe { 
+		libc::setsockopt(
+			sock_fd, 
+			libc::SOL_SOCKET,
+			libc::SO_RCVTIMEO,
+			&recv_timeval as *const _ as *const libc::c_void,
+			std::mem::size_of_val(&recv_timeval) as libc::socklen_t,
+			) 
+	};
+
+	if result < 0 {
+		panic!("set socket timeout option failed");
+	}
 }
 
 fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u8; 6]) {
@@ -88,8 +111,14 @@ fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) {
 
 	loop {
 		let recv_bytes = unsafe { libc::read(sock_fd, buf.as_ptr() as *mut libc::c_void, buf.len()) };
+
 		if recv_bytes < 0 {
-			panic!("recv failed");
+			let errno = unsafe { *libc::__errno_location() };
+			if errno == libc::EWOULDBLOCK {
+				println!("Timeout");
+			} else {
+				panic!("recv failed");
+			}
 		}
 
 		let (eth_hdr, arp_hdr) = buf.split_at_mut(libc::ETH_HLEN as usize);
