@@ -44,17 +44,30 @@ fn main() {
         panic!("bind failed");
     }
 
-    set_sock_timeout(sock_fd);
+    set_nonblocking_socket(sock_fd);
 
     let mut index = 0;
     println!("ARPING {}", fmt_ip(dest_ip));
     while index < count {
         let start_time = Instant::now(); // monotonic time
         send_arp_request(sock_fd, dest_ip, src_ip, src_mac);
-        recv_arp_reply(sock_fd, src_mac, index, start_time);
+
+        while start_time.elapsed() < Duration::from_secs(1) {
+            match recv_arp_reply(sock_fd, src_mac, index, start_time) {
+                Ok(_) => {
+                    break;
+                }
+                Err(_) => {
+                    println!("Timeout index: {index}");
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            }
+        }
 
         if index < count - 1 {
-            std::thread::sleep(Duration::from_secs(1));
+            if start_time.elapsed() < Duration::from_secs(1) {
+                std::thread::sleep(Duration::from_secs(1) - start_time.elapsed());
+            }
         }
         index += 1;
     }
@@ -77,6 +90,18 @@ fn set_sock_timeout(sock_fd: i32) {
 
     if result < 0 {
         panic!("set socket timeout option failed");
+    }
+}
+
+fn set_nonblocking_socket(sock_fd: i32) {
+    let flags = unsafe { libc::fcntl(sock_fd, libc::F_GETFL, 0) };
+    if flags < 0 {
+        panic!("fcntl F_GETFL failed");
+    }
+
+    let result = unsafe { libc::fcntl(sock_fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+    if result < 0 {
+        panic!("fcntl F_SETFL failed");
     }
 }
 
@@ -111,7 +136,7 @@ fn send_arp_request(sock_fd: i32, dest_ip: [u8; 4], src_ip: [u8; 4], src_mac: [u
     }
 }
 
-fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) {
+fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) -> Result<(), i32> {
     let mut buf = [0u8; 42];
 
     loop {
@@ -121,7 +146,7 @@ fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) {
         if recv_bytes < 0 {
             let errno = unsafe { *libc::__errno_location() };
             if errno == libc::EWOULDBLOCK {
-                println!("Timeout");
+                return Err(errno);
             } else {
                 panic!("recv failed");
             }
@@ -149,6 +174,6 @@ fn recv_arp_reply(sock_fd: i32, mac: [u8; 6], index: u16, start_time: Instant) {
             fmt_duration(elapsed)
         );
 
-        break;
+        return Ok(());
     }
 }
